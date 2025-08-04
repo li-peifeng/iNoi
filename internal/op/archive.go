@@ -371,7 +371,7 @@ func DriverExtract(ctx context.Context, storage driver.Driver, path string, args
 		return link.Link, link.Obj, nil
 	}
 
-	var forget utils.CloseFunc
+	var forget any
 	fn := func() (*extractLink, error) {
 		link, err := driverExtract(ctx, storage, path, args)
 		if err != nil {
@@ -380,7 +380,7 @@ func DriverExtract(ctx context.Context, storage driver.Driver, path string, args
 		if link.Link.Expiration != nil {
 			extractCache.Set(key, link, cache.WithEx[*extractLink](*link.Link.Expiration))
 		}
-		link.Add(forget)
+		link.AddIfCloser(forget)
 		return link, nil
 	}
 
@@ -392,13 +392,13 @@ func DriverExtract(ctx context.Context, storage driver.Driver, path string, args
 		return link.Link, link.Obj, nil
 	}
 
-	forget = func() error {
+	forget = utils.CloseFunc(func() error {
 		if forget != nil {
 			forget = nil
 			linkG.Forget(key)
 		}
 		return nil
-	}
+	})
 	link, err, _ := extractG.Do(key, fn)
 	if err == nil && !link.AcquireReference() {
 		link, err, _ = extractG.Do(key, fn)

@@ -291,7 +291,7 @@ func Link(ctx context.Context, storage driver.Driver, path string, args model.Li
 		return link, file, nil
 	}
 
-	var forget utils.CloseFunc
+	var forget any
 	fn := func() (*model.Link, error) {
 		link, err := storage.Link(ctx, file, args)
 		if err != nil {
@@ -300,7 +300,7 @@ func Link(ctx context.Context, storage driver.Driver, path string, args model.Li
 		if link.Expiration != nil {
 			linkCache.Set(key, link, cache.WithEx[*model.Link](*link.Expiration))
 		}
-		link.Add(forget)
+		link.AddIfCloser(forget)
 		return link, nil
 	}
 
@@ -312,13 +312,13 @@ func Link(ctx context.Context, storage driver.Driver, path string, args model.Li
 		return link, file, err
 	}
 
-	forget = func() error {
+	forget = utils.CloseFunc(func() error {
 		if forget != nil {
 			forget = nil
 			linkG.Forget(key)
 		}
 		return nil
-	}
+	})
 	link, err, _ := linkG.Do(key, fn)
 	if err == nil && !link.AcquireReference() {
 		link, err, _ = linkG.Do(key, fn)
