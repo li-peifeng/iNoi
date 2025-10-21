@@ -74,7 +74,6 @@ func (d *Pan123) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 			"type":      f.Type,
 		}
 		resp, err := d.Request(DownloadInfo, http.MethodPost, func(req *resty.Request) {
-
 			req.SetBody(data)
 		}, nil)
 		if err != nil {
@@ -182,9 +181,7 @@ func (d *Pan123) Put(ctx context.Context, dstDir model.Obj, file model.FileStrea
 	etag := file.GetHash().GetHash(utils.MD5)
 	var err error
 	if len(etag) < utils.MD5.Width {
-		cacheFileProgress := model.UpdateProgressWithRange(up, 0, 50)
-		up = model.UpdateProgressWithRange(up, 50, 100)
-		_, etag, err = stream.CacheFullInTempFileAndHash(file, cacheFileProgress, utils.MD5)
+		_, etag, err = stream.CacheFullAndHash(file, &up, utils.MD5)
 		if err != nil {
 			return err
 		}
@@ -254,6 +251,17 @@ func (d *Pan123) APIRateLimit(ctx context.Context, api string) error {
 	limiter := value.(*rate.Limiter)
 
 	return limiter.Wait(ctx)
+}
+
+func (d *Pan123) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
+	userInfo, err := d.getUserInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	total := userInfo.Data.SpacePermanent + userInfo.Data.SpaceTemp
+	return &model.StorageDetails{
+		DiskUsage: driver.DiskUsageFromUsedAndTotal(userInfo.Data.SpaceUsed, total),
+	}, nil
 }
 
 var _ driver.Driver = (*Pan123)(nil)

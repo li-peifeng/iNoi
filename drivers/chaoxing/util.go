@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
@@ -167,12 +168,12 @@ func (d *ChaoXing) Login() (string, error) {
 		return "", err
 	}
 	// Create the request
-	req, err := http.NewRequest("POST", "https://passport2.chaoxing.com/fanyalogin", body)
+	req, err := http.NewRequest(http.MethodPost, "https://passport2.chaoxing.com/fanyalogin", body)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Content-Length", fmt.Sprintf("%d", body.Len()))
+	req.Header.Set("Content-Length", strconv.Itoa(body.Len()))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err

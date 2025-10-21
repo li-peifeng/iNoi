@@ -2,37 +2,73 @@ package alias
 
 import (
 	"context"
-	"fmt"
-	"net/url"
+	"errors"
 	stdpath "path"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/fs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
-	"github.com/OpenListTeam/OpenList/v4/internal/sign"
-	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
+	log "github.com/sirupsen/logrus"
 )
 
-func (d *Alias) listRoot() []model.Obj {
+func (d *Alias) listRoot(ctx context.Context, withDetails, refresh bool) []model.Obj {
 	var objs []model.Obj
-	for k := range d.pathMap {
+	var wg sync.WaitGroup
+	for _, k := range d.rootOrder {
 		obj := model.Object{
 			Name:     k,
 			IsFolder: true,
 			Modified: d.Modified,
 		}
+		idx := len(objs)
 		objs = append(objs, &obj)
+		v := d.pathMap[k]
+		if !withDetails || len(v) != 1 {
+			continue
+		}
+		remoteDriver, err := op.GetStorageByMountPath(v[0])
+		if err != nil {
+			continue
+		}
+		_, ok := remoteDriver.(driver.WithDetails)
+		if !ok {
+			continue
+		}
+		objs[idx] = &model.ObjStorageDetails{
+			Obj: objs[idx],
+			StorageDetailsWithName: model.StorageDetailsWithName{
+				StorageDetails: nil,
+				DriverName:     remoteDriver.Config().Name,
+			},
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c, cancel := context.WithTimeout(ctx, time.Second)
+			defer cancel()
+			details, e := op.GetStorageDetails(c, remoteDriver, refresh)
+			if e != nil {
+				if !errors.Is(e, errs.NotImplement) && !errors.Is(e, errs.StorageNotInit) {
+					log.Errorf("failed get %s storage details: %+v", remoteDriver.GetStorage().MountPath, e)
+				}
+				return
+			}
+			objs[idx].(*model.ObjStorageDetails).StorageDetails = details
+		}()
 	}
+	wg.Wait()
 	return objs
 }
 
 // do others that not defined in Driver interface
 func getPair(path string) (string, string) {
-	//path = strings.TrimSpace(path)
+	// path = strings.TrimSpace(path)
 	if strings.Contains(path, ":") {
 		pair := strings.SplitN(path, ":", 2)
 		if !strings.Contains(pair[0], "/") {
@@ -54,55 +90,12 @@ func (d *Alias) getRootAndPath(path string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func (d *Alias) get(ctx context.Context, path string, dst, sub string) (model.Obj, error) {
-	obj, err := fs.Get(ctx, stdpath.Join(dst, sub), &fs.GetArgs{NoLog: true})
-	if err != nil {
-		return nil, err
-	}
-	return &model.Object{
-		Path:     path,
-		Name:     obj.GetName(),
-		Size:     obj.GetSize(),
-		Modified: obj.ModTime(),
-		IsFolder: obj.IsDir(),
-		HashInfo: obj.GetHash(),
-	}, nil
-}
-
-func (d *Alias) list(ctx context.Context, dst, sub string, args *fs.ListArgs) ([]model.Obj, error) {
-	objs, err := fs.List(ctx, stdpath.Join(dst, sub), args)
-	// the obj must implement the model.SetPath interface
-	// return objs, err
-	if err != nil {
-		return nil, err
-	}
-	return utils.SliceConvert(objs, func(obj model.Obj) (model.Obj, error) {
-		thumb, ok := model.GetThumb(obj)
-		objRes := model.Object{
-			Name:     obj.GetName(),
-			Size:     obj.GetSize(),
-			Modified: obj.ModTime(),
-			IsFolder: obj.IsDir(),
-		}
-		if !ok {
-			return &objRes, nil
-		}
-		return &model.ObjThumb{
-			Object: objRes,
-			Thumbnail: model.Thumbnail{
-				Thumbnail: thumb,
-			},
-		}, nil
-	})
-}
-
 func (d *Alias) link(ctx context.Context, reqPath string, args model.LinkArgs) (*model.Link, model.Obj, error) {
 	storage, reqActualPath, err := op.GetStorageAndActualPath(reqPath)
 	if err != nil {
 		return nil, nil, err
 	}
-	// proxy || ftp,s3
-	if !args.Redirect || len(common.GetApiUrl(ctx)) == 0 {
+	if !args.Redirect {
 		return op.Link(ctx, storage, reqActualPath, args)
 	}
 	obj, err := fs.Get(ctx, reqPath, &fs.GetArgs{NoLog: true})
@@ -183,8 +176,7 @@ func (d *Alias) listArchive(ctx context.Context, dst, sub string, args model.Arc
 	return nil, errs.NotImplement
 }
 
-func (d *Alias) extract(ctx context.Context, dst, sub string, args model.ArchiveInnerArgs) (*model.Link, error) {
-	reqPath := stdpath.Join(dst, sub)
+func (d *Alias) extract(ctx context.Context, reqPath string, args model.ArchiveInnerArgs) (*model.Link, error) {
 	storage, reqActualPath, err := op.GetStorageAndActualPath(reqPath)
 	if err != nil {
 		return nil, err
@@ -192,20 +184,12 @@ func (d *Alias) extract(ctx context.Context, dst, sub string, args model.Archive
 	if _, ok := storage.(driver.ArchiveReader); !ok {
 		return nil, errs.NotImplement
 	}
-	if args.Redirect && common.ShouldProxy(storage, stdpath.Base(sub)) {
-		_, err = fs.Get(ctx, reqPath, &fs.GetArgs{NoLog: true})
-		if err != nil {
+	if args.Redirect && common.ShouldProxy(storage, stdpath.Base(reqPath)) {
+		_, err := fs.Get(ctx, reqPath, &fs.GetArgs{NoLog: true})
+		if err == nil {
 			return nil, err
 		}
-		link := &model.Link{
-			URL: fmt.Sprintf("%s/ap%s?inner=%s&pass=%s&sign=%s",
-				common.GetApiUrl(ctx),
-				utils.EncodePath(reqPath, true),
-				utils.EncodePath(args.InnerPath, true),
-				url.QueryEscape(args.Password),
-				sign.SignArchive(reqPath)),
-		}
-		return link, nil
+		return nil, nil
 	}
 	link, _, err := op.DriverExtract(ctx, storage, reqActualPath, args)
 	return link, err

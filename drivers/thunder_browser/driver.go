@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -491,9 +492,7 @@ func (xc *XunLeiBrowserCommon) Put(ctx context.Context, dstDir model.Obj, stream
 	gcid := stream.GetHash().GetHash(hash_extend.GCID)
 	var err error
 	if len(gcid) < hash_extend.GCID.Width {
-		cacheFileProgress := model.UpdateProgressWithRange(up, 0, 50)
-		up = model.UpdateProgressWithRange(up, 50, 100)
-		_, gcid, err = streamPkg.CacheFullInTempFileAndHash(stream, cacheFileProgress, hash_extend.GCID, stream.GetSize())
+		_, gcid, err = streamPkg.CacheFullAndHash(stream, &up, hash_extend.GCID, stream.GetSize())
 		if err != nil {
 			return err
 		}
@@ -842,7 +841,7 @@ func (xc *XunLeiBrowserCommon) OfflineList(ctx context.Context, nextPageToken st
 func (xc *XunLeiBrowserCommon) DeleteOfflineTasks(ctx context.Context, taskIDs []string) error {
 	queryParams := map[string]string{
 		"task_ids": strings.Join(taskIDs, ","),
-		"_t":       fmt.Sprintf("%d", time.Now().UnixMilli()),
+		"_t":       strconv.FormatInt(time.Now().UnixMilli(), 10),
 	}
 	if xc.UseFluentPlay {
 		queryParams["space"] = ThunderBrowserDriveFluentPlayFolderType

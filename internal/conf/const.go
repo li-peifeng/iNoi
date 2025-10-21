@@ -17,22 +17,28 @@ const (
 	AllowMounted = "allow_mounted"
 	RobotsTxt    = "robots_txt"
 
-	Logo      = "logo" // multi-lines text, L1: light, EOL: dark
-	Favicon   = "favicon"
-	MainColor = "main_color"
+	Logo                           = "logo" // multi-lines text, L1: light, EOL: dark
+	Favicon                        = "favicon"
+	MainColor                      = "main_color"
+	HideStorageDetails             = "hide_storage_details"
+	HideStorageDetailsInManagePage = "hide_storage_details_in_manage_page"
 
 	// preview
-	TextTypes                = "text_types"
-	AudioTypes               = "audio_types"
-	VideoTypes               = "video_types"
-	ImageTypes               = "image_types"
-	ProxyTypes               = "proxy_types"
-	ProxyIgnoreHeaders       = "proxy_ignore_headers"
-	AudioAutoplay            = "audio_autoplay"
-	VideoAutoplay            = "video_autoplay"
-	PreviewArchivesByDefault = "preview_archives_by_default"
-	ReadMeAutoRender         = "readme_autorender"
-	FilterReadMeScripts      = "filter_readme_scripts"
+	TextTypes                     = "text_types"
+	AudioTypes                    = "audio_types"
+	VideoTypes                    = "video_types"
+	ImageTypes                    = "image_types"
+	ProxyTypes                    = "proxy_types"
+	ProxyIgnoreHeaders            = "proxy_ignore_headers"
+	AudioAutoplay                 = "audio_autoplay"
+	VideoAutoplay                 = "video_autoplay"
+	PreviewDownloadByDefault      = "preview_download_by_default"
+	PreviewArchivesByDefault      = "preview_archives_by_default"
+	SharePreviewDownloadByDefault = "share_preview_download_by_default"
+	SharePreviewArchivesByDefault = "share_preview_archives_by_default"
+	ReadMeAutoRender              = "readme_autorender"
+	FilterReadMeScripts           = "filter_readme_scripts"
+
 	// global
 	HideFiles               = "hide_files"
 	CustomizeHead           = "customize_head"
@@ -45,6 +51,10 @@ const (
 	ForwardDirectLinkParams = "forward_direct_link_params"
 	IgnoreDirectLinkParams  = "ignore_direct_link_params"
 	WebauthnLoginEnabled    = "webauthn_login_enabled"
+	SharePreview            = "share_preview"
+	ShareArchivePreview     = "share_archive_preview"
+	ShareForceProxy         = "share_force_proxy"
+	ShareSummaryContent     = "share_summary_content"
 
 	// index
 	SearchIndex     = "search_index"
@@ -118,14 +128,18 @@ const (
 	QbittorrentUrl      = "qbittorrent_url"
 	QbittorrentSeedtime = "qbittorrent_seedtime"
 
+	// 123 open offline download
+	Pan123OpenOfflineDownloadCallbackUrl = "123_open_callback_url"
+	Pan123OpenTempDir                    = "123_open_temp_dir"
+
 	// ftp
-	FTPPublicHost        = "ftp_public_host"
-	FTPPasvPortMap       = "ftp_pasv_port_map"
-	FTPProxyUserAgent    = "ftp_proxy_user_agent"
-	FTPMandatoryTLS      = "ftp_mandatory_tls"
-	FTPImplicitTLS       = "ftp_implicit_tls"
-	FTPTLSPrivateKeyPath = "ftp_tls_private_key_path"
-	FTPTLSPublicCertPath = "ftp_tls_public_cert_path"
+	FTPPublicHost            = "ftp_public_host"
+	FTPPasvPortMap           = "ftp_pasv_port_map"
+	FTPMandatoryTLS          = "ftp_mandatory_tls"
+	FTPImplicitTLS           = "ftp_implicit_tls"
+	FTPTLSPrivateKeyPath     = "ftp_tls_private_key_path"
+	FTPTLSPublicCertPath     = "ftp_tls_public_cert_path"
+	SFTPDisablePasswordLogin = "sftp_disable_password_login"
 
 	// traffic
 	TaskOfflineDownloadThreadsNum         = "offline_download_task_threads_num"
@@ -167,4 +181,5 @@ const (
 	RequestHeaderKey
 	UserAgentKey
 	PathKey
+	SharingIDKey
 )

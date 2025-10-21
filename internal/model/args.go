@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -12,9 +11,10 @@ import (
 )
 
 type ListArgs struct {
-	ReqPath           string
-	S3ShowPlaceholder bool
-	Refresh           bool
+	ReqPath            string
+	S3ShowPlaceholder  bool
+	Refresh            bool
+	WithStorageDetails bool
 }
 
 type LinkArgs struct {
@@ -28,7 +28,6 @@ type Link struct {
 	URL         string        `json:"url"`    // most common way
 	Header      http.Header   `json:"header"` // needed header (for url)
 	RangeReader RangeReaderIF `json:"-"`      // recommended way if can't use URL
-	MFile       File          `json:"-"`      // best for local,smb... file system, which exposes MFile
 
 	Expiration *time.Duration // local cache expire Duration
 
@@ -38,13 +37,8 @@ type Link struct {
 	ContentLength int64 `json:"-"` // 转码视频、缩略图
 
 	utils.SyncClosers `json:"-"`
-}
-
-func (l *Link) Close() error {
-	if clr, ok := l.MFile.(io.Closer); ok {
-		return errors.Join(clr.Close(), l.SyncClosers.Close())
-	}
-	return l.SyncClosers.Close()
+	// 如果SyncClosers中的资源被关闭后Link将不可用，则此值应为 true
+	RequireReference bool `json:"-"`
 }
 
 type OtherArgs struct {
@@ -83,6 +77,26 @@ type ArchiveDecompressArgs struct {
 	ArchiveInnerArgs
 	CacheFull     bool
 	PutIntoNewDir bool
+}
+
+type SharingListArgs struct {
+	Refresh bool
+	Pwd     string
+}
+
+type SharingArchiveMetaArgs struct {
+	ArchiveMetaArgs
+	Pwd string
+}
+
+type SharingArchiveListArgs struct {
+	ArchiveListArgs
+	Pwd string
+}
+
+type SharingLinkArgs struct {
+	Pwd string
+	LinkArgs
 }
 
 type RangeReaderIF interface {

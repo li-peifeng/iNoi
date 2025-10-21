@@ -157,7 +157,7 @@ func (d *Cloud189) request(url string, method string, callback base.ReqCallback,
 	if err != nil {
 		return nil, err
 	}
-	//log.Debug(res.String())
+	// log.Debug(res.String())
 	if e.ErrorCode != "" {
 		if e.ErrorCode == "InvalidSessionKey" {
 			err = d.newLogin()
@@ -186,8 +186,8 @@ func (d *Cloud189) getFiles(fileId string) ([]model.Obj, error) {
 				"mediaType":  "0",
 				"folderId":   fileId,
 				"iconOption": "5",
-				"orderBy":    "lastOpTime", //account.OrderBy
-				"descending": "true",       //account.OrderDirection
+				"orderBy":    "lastOpTime", // account.OrderBy
+				"descending": "true",       // account.OrderDirection
 			})
 		}, &resp)
 		if err != nil {
@@ -311,7 +311,7 @@ func (d *Cloud189) newUpload(ctx context.Context, dstDir model.Obj, file model.F
 	}
 	d.sessionKey = sessionKey
 	const DEFAULT int64 = 10485760
-	var count = int64(math.Ceil(float64(file.GetSize()) / float64(DEFAULT)))
+	count := int64(math.Ceil(float64(file.GetSize()) / float64(DEFAULT)))
 
 	res, err := d.uploadRequest("/person/initMultiUpload", map[string]string{
 		"parentFolderId": dstDir.GetID(),
@@ -340,10 +340,10 @@ func (d *Cloud189) newUpload(ctx context.Context, dstDir model.Obj, file model.F
 		if DEFAULT < byteSize {
 			byteSize = DEFAULT
 		}
-		//log.Debugf("%d,%d", byteSize, finish)
+		// log.Debugf("%d,%d", byteSize, finish)
 		byteData := make([]byte, byteSize)
 		n, err := io.ReadFull(file, byteData)
-		//log.Debug(err, n)
+		// log.Debug(err, n)
 		if err != nil {
 			return err
 		}
@@ -365,11 +365,10 @@ func (d *Cloud189) newUpload(ctx context.Context, dstDir model.Obj, file model.F
 		log.Debugf("uploadData: %+v", uploadData)
 		requestURL := uploadData.RequestURL
 		uploadHeaders := strings.Split(decodeURIComponent(uploadData.RequestHeader), "&")
-		req, err := http.NewRequest(http.MethodPut, requestURL, driver.NewLimitedUploadStream(ctx, bytes.NewReader(byteData)))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPut, requestURL, driver.NewLimitedUploadStream(ctx, bytes.NewReader(byteData)))
 		if err != nil {
 			return err
 		}
-		req = req.WithContext(ctx)
 		for _, v := range uploadHeaders {
 			i := strings.Index(v, "=")
 			req.Header.Set(v[0:i], v[i+1:])
@@ -395,4 +394,15 @@ func (d *Cloud189) newUpload(ctx context.Context, dstDir model.Obj, file model.F
 		"opertype":     "3",
 	}, nil)
 	return err
+}
+
+func (d *Cloud189) getCapacityInfo(ctx context.Context) (*CapacityResp, error) {
+	var resp CapacityResp
+	_, err := d.request("https://cloud.189.cn/api/portal/getUserSizeInfo.action", http.MethodGet, func(req *resty.Request) {
+		req.SetContext(ctx)
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }

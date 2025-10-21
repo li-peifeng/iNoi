@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -164,6 +166,7 @@ func (c *Closers) Close() error {
 			errs = append(errs, closer.Close())
 		}
 	}
+	clear(*c)
 	*c = (*c)[:0]
 	return errors.Join(errs...)
 }
@@ -184,64 +187,78 @@ func NewClosers(c ...io.Closer) Closers {
 	return Closers(c)
 }
 
-type SyncClosersIF interface {
-	ClosersIF
-	AcquireReference() bool
-}
-
 type SyncClosers struct {
 	closers []io.Closer
-	mu      sync.Mutex
-	ref     int
+	ref     int32
 }
 
-var _ SyncClosersIF = (*SyncClosers)(nil)
-
+// if closed, return false
 func (c *SyncClosers) AcquireReference() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if len(c.closers) == 0 {
-		return false
+	ref := atomic.AddInt32(&c.ref, 1)
+	if ref > 0 {
+		// log.Debugf("AcquireReference %p: %d", c, ref)
+		return true
 	}
-	c.ref++
-	log.Debugf("SyncClosers.AcquireReference %p,ref=%d\n", c, c.ref)
-	return true
+	atomic.StoreInt32(&c.ref, closersClosed)
+	return false
 }
+
+const closersClosed = math.MinInt32
 
 func (c *SyncClosers) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	defer log.Debugf("SyncClosers.Close %p,ref=%d\n", c, c.ref)
-	if c.ref > 1 {
-		c.ref--
-		return nil
+	for {
+		ref := atomic.LoadInt32(&c.ref)
+		if ref < 0 {
+			return nil
+		}
+		if ref > 1 {
+			if atomic.CompareAndSwapInt32(&c.ref, ref, ref-1) {
+				// log.Debugf("ReleaseReference %p: %d", c, ref)
+				return nil
+			}
+		} else if atomic.CompareAndSwapInt32(&c.ref, ref, closersClosed) {
+			break
+		}
 	}
-	c.ref = 0
 
+	// log.Debugf("FinalClose %p", c)
 	var errs []error
 	for _, closer := range c.closers {
 		if closer != nil {
 			errs = append(errs, closer.Close())
 		}
 	}
-	c.closers = c.closers[:0]
+	clear(c.closers)
+	c.closers = nil
 	return errors.Join(errs...)
 }
 
 func (c *SyncClosers) Add(closer io.Closer) {
 	if closer != nil {
-		c.mu.Lock()
+		if atomic.LoadInt32(&c.ref) < 0 {
+			panic("Not reusable")
+		}
 		c.closers = append(c.closers, closer)
-		c.mu.Unlock()
 	}
 }
 
 func (c *SyncClosers) AddIfCloser(a any) {
 	if closer, ok := a.(io.Closer); ok {
-		c.mu.Lock()
+		if atomic.LoadInt32(&c.ref) < 0 {
+			panic("Not reusable")
+		}
 		c.closers = append(c.closers, closer)
-		c.mu.Unlock()
 	}
+}
+
+var _ ClosersIF = (*SyncClosers)(nil)
+
+// 实现cache.Expirable接口
+func (c *SyncClosers) Expired() bool {
+	return atomic.LoadInt32(&c.ref) < 0
+}
+func (c *SyncClosers) Length() int {
+	return len(c.closers)
 }
 
 func NewSyncClosers(c ...io.Closer) SyncClosers {
@@ -278,11 +295,7 @@ var IoBuffPool = &sync.Pool{
 func CopyWithBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 	buff := IoBuffPool.Get().([]byte)
 	defer IoBuffPool.Put(buff)
-	written, err = io.CopyBuffer(dst, src, buff)
-	if err != nil {
-		return
-	}
-	return written, nil
+	return io.CopyBuffer(dst, src, buff)
 }
 
 func CopyWithBufferN(dst io.Writer, src io.Reader, n int64) (written int64, err error) {

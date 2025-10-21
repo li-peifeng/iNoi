@@ -41,6 +41,18 @@ func (t *ArchiveDownloadTask) Run() error {
 	if err := t.ReinitCtx(); err != nil {
 		return err
 	}
+	if t.SrcStorage == nil {
+		if srcStorage, _, err := op.GetStorageAndActualPath(t.SrcStorageMp); err == nil {
+			t.SrcStorage = srcStorage
+		} else {
+			return err
+		}
+		if dstStorage, _, err := op.GetStorageAndActualPath(t.DstStorageMp); err == nil {
+			t.DstStorage = dstStorage
+		} else {
+			return err
+		}
+	}
 	t.ClearEndTime()
 	t.SetStartTime(time.Now())
 	defer func() { t.SetEndTime(time.Now()) }()
@@ -70,25 +82,25 @@ func (t *ArchiveDownloadTask) RunWithoutPushUploadTask() (*ArchiveContentUploadT
 	}()
 	var decompressUp model.UpdateProgress
 	if t.CacheFull {
-		var total, cur int64 = 0, 0
+		total := int64(0)
 		for _, s := range ss {
 			total += s.GetSize()
 		}
 		t.SetTotalBytes(total)
 		t.Status = "getting src object"
-		for _, s := range ss {
-			if s.GetFile() == nil {
-				_, err = stream.CacheFullInTempFileAndWriter(s, func(p float64) {
-					t.SetProgress((float64(cur) + float64(s.GetSize())*p/100.0) / float64(total))
-				}, nil)
+		part := 100 / float64(len(ss)+1)
+		for i, s := range ss {
+			if s.GetFile() != nil {
+				continue
 			}
-			cur += s.GetSize()
+			_, err = s.CacheFullAndWriter(nil, nil)
 			if err != nil {
 				return nil, err
+			} else {
+				t.SetProgress(float64(i+1) * part)
 			}
 		}
-		t.SetProgress(100.0)
-		decompressUp = func(_ float64) {}
+		decompressUp = model.UpdateProgressWithRange(t.SetProgress, 100-part, 100)
 	} else {
 		decompressUp = t.SetProgress
 	}

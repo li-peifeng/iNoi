@@ -1,34 +1,42 @@
 package _123_open
 
 import (
+	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
-var ( //不同情况下获取的AccessTokenQPS限制不同 如下模块化易于拓展
+var ( // 不同情况下获取的AccessTokenQPS限制不同 如下模块化易于拓展
 	Api = "https://open-api.123pan.com"
 
 	AccessToken    = InitApiInfo(Api+"/api/v1/access_token", 1)
 	RefreshToken   = InitApiInfo(Api+"/api/v1/oauth2/access_token", 1)
 	UserInfo       = InitApiInfo(Api+"/api/v1/user/info", 1)
-	FileList       = InitApiInfo(Api+"/api/v2/file/list", 4)
-	DownloadInfo   = InitApiInfo(Api+"/api/v1/file/download_info", 0)
+	FileList       = InitApiInfo(Api+"/api/v2/file/list", 3)
+	DownloadInfo   = InitApiInfo(Api+"/api/v1/file/download_info", 5)
+	DirectLink     = InitApiInfo(Api+"/api/v1/direct-link/url", 5)
 	Mkdir          = InitApiInfo(Api+"/upload/v1/file/mkdir", 2)
 	Move           = InitApiInfo(Api+"/api/v1/file/move", 1)
 	Rename         = InitApiInfo(Api+"/api/v1/file/name", 1)
 	Trash          = InitApiInfo(Api+"/api/v1/file/trash", 2)
-	UploadCreate   = InitApiInfo(Api+"/upload/v1/file/create", 2)
-	UploadUrl      = InitApiInfo(Api+"/upload/v1/file/get_upload_url", 0)
-	UploadComplete = InitApiInfo(Api+"/upload/v1/file/upload_complete", 0)
-	UploadAsync    = InitApiInfo(Api+"/upload/v1/file/upload_async_result", 1)
+	UploadCreate   = InitApiInfo(Api+"/upload/v2/file/create", 2)
+	UploadComplete = InitApiInfo(Api+"/upload/v2/file/upload_complete", 0)
+
+	OfflineDownload        = InitApiInfo(Api+"/api/v1/offline/download", 1)
+	OfflineDownloadProcess = InitApiInfo(Api+"/api/v1/offline/download/process", 5)
 )
 
 func (d *Open123) Request(apiInfo *ApiInfo, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
@@ -78,12 +86,27 @@ func (d *Open123) Request(apiInfo *ApiInfo, method string, callback base.ReqCall
 			return nil, errors.New(baseResp.Message)
 		}
 	}
-
 }
 
 func (d *Open123) flushAccessToken() error {
-	if d.Addition.ClientID != "" {
-		if d.Addition.ClientSecret != "" {
+	if d.ClientID != "" {
+		if d.RefreshToken != "" {
+			var resp RefreshTokenResp
+			_, err := d.Request(RefreshToken, http.MethodPost, func(req *resty.Request) {
+				req.SetQueryParam("client_id", d.ClientID)
+				if d.ClientSecret != "" {
+					req.SetQueryParam("client_secret", d.ClientSecret)
+				}
+				req.SetQueryParam("grant_type", "refresh_token")
+				req.SetQueryParam("refresh_token", d.RefreshToken)
+			}, &resp)
+			if err != nil {
+				return err
+			}
+			d.AccessToken = resp.AccessToken
+			d.RefreshToken = resp.RefreshToken
+			op.MustSaveDriverStorage(d)
+		} else if d.ClientSecret != "" {
 			var resp AccessTokenResp
 			_, err := d.Request(AccessToken, http.MethodPost, func(req *resty.Request) {
 				req.SetBody(base.Json{
@@ -96,32 +119,60 @@ func (d *Open123) flushAccessToken() error {
 			}
 			d.AccessToken = resp.Data.AccessToken
 			op.MustSaveDriverStorage(d)
-		} else if d.Addition.RefreshToken != "" {
-			var resp RefreshTokenResp
-			_, err := d.Request(RefreshToken, http.MethodPost, func(req *resty.Request) {
-				req.SetQueryParam("client_id", d.ClientID)
-				req.SetQueryParam("grant_type", "refresh_token")
-				req.SetQueryParam("refresh_token", d.Addition.RefreshToken)
-			}, &resp)
-			if err != nil {
-				return err
-			}
-			d.AccessToken = resp.AccessToken
-			d.RefreshToken = resp.RefreshToken
-			op.MustSaveDriverStorage(d)
 		}
 	}
 	return nil
 }
 
-func (d *Open123) getUserInfo() (*UserInfoResp, error) {
+func (d *Open123) SignURL(originURL, privateKey string, uid uint64, validDuration time.Duration) (newURL string, err error) {
+	// 生成Unix时间戳
+	ts := time.Now().Add(validDuration).Unix()
+
+	// 生成随机数（建议使用UUID，不能包含中划线（-））
+	rand := strings.ReplaceAll(uuid.New().String(), "-", "")
+
+	// 解析URL
+	objURL, err := url.Parse(originURL)
+	if err != nil {
+		return "", err
+	}
+
+	// 待签名字符串，格式：path-timestamp-rand-uid-privateKey
+	unsignedStr := fmt.Sprintf("%s-%d-%s-%d-%s", objURL.Path, ts, rand, uid, privateKey)
+	md5Hash := md5.Sum([]byte(unsignedStr))
+	// 生成鉴权参数，格式：timestamp-rand-uid-md5hash
+	authKey := fmt.Sprintf("%d-%s-%d-%x", ts, rand, uid, md5Hash)
+
+	// 添加鉴权参数到URL查询参数
+	v := objURL.Query()
+	v.Add("auth_key", authKey)
+	objURL.RawQuery = v.Encode()
+
+	return objURL.String(), nil
+}
+
+func (d *Open123) getUserInfo(ctx context.Context) (*UserInfoResp, error) {
 	var resp UserInfoResp
 
-	if _, err := d.Request(UserInfo, http.MethodGet, nil, &resp); err != nil {
+	if _, err := d.Request(UserInfo, http.MethodGet, func(req *resty.Request) {
+		req.SetContext(ctx)
+	}, &resp); err != nil {
 		return nil, err
 	}
 
 	return &resp, nil
+}
+
+func (d *Open123) getUID(ctx context.Context) (uint64, error) {
+	if d.UID != 0 {
+		return d.UID, nil
+	}
+	resp, err := d.getUserInfo(ctx)
+	if err != nil {
+		return 0, err
+	}
+	d.UID = resp.Data.UID
+	return resp.Data.UID, nil
 }
 
 func (d *Open123) getFiles(parentFileId int64, limit int, lastFileId int64) (*FileListResp, error) {
@@ -138,7 +189,6 @@ func (d *Open123) getFiles(parentFileId int64, limit int, lastFileId int64) (*Fi
 				"searchData":   "",
 			})
 	}, &resp)
-
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +202,21 @@ func (d *Open123) getDownloadInfo(fileId int64) (*DownloadInfoResp, error) {
 	_, err := d.Request(DownloadInfo, http.MethodGet, func(req *resty.Request) {
 		req.SetQueryParams(map[string]string{
 			"fileId": strconv.FormatInt(fileId, 10),
+		})
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func (d *Open123) getDirectLink(fileId int64) (*DirectLinkResp, error) {
+	var resp DirectLinkResp
+
+	_, err := d.Request(DirectLink, http.MethodGet, func(req *resty.Request) {
+		req.SetQueryParams(map[string]string{
+			"fileID": strconv.FormatInt(fileId, 10),
 		})
 	}, &resp)
 	if err != nil {
@@ -214,4 +279,35 @@ func (d *Open123) trash(fileId int64) error {
 	}
 
 	return nil
+}
+
+func (d *Open123) createOfflineDownloadTask(ctx context.Context, url string, dirID, callback string) (taskID int, err error) {
+	body := base.Json{
+		"url":   url,
+		"dirID": dirID,
+	}
+	if len(callback) > 0 {
+		body["callBackUrl"] = callback
+	}
+	var resp OfflineDownloadResp
+	_, err = d.Request(OfflineDownload, http.MethodPost, func(req *resty.Request) {
+		req.SetBody(body)
+	}, &resp)
+	if err != nil {
+		return 0, err
+	}
+	return resp.Data.TaskID, nil
+}
+
+func (d *Open123) queryOfflineDownloadStatus(ctx context.Context, taskID int) (process float64, status int, err error) {
+	var resp OfflineDownloadProcessResp
+	_, err = d.Request(OfflineDownloadProcess, http.MethodGet, func(req *resty.Request) {
+		req.SetQueryParams(map[string]string{
+			"taskID": strconv.Itoa(taskID),
+		})
+	}, &resp)
+	if err != nil {
+		return .0, 0, err
+	}
+	return resp.Data.Process, resp.Data.Status, nil
 }
