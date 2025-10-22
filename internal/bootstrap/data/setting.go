@@ -126,25 +126,7 @@ func InitialSettings() []model.SettingItem {
 		{Key: conf.ProxyTypes, Value: "m3u8,url", Type: conf.TypeText, Group: model.PREVIEW, Flag: model.PRIVATE},
 		{Key: conf.ProxyIgnoreHeaders, Value: "authorization,referer", Type: conf.TypeText, Group: model.PREVIEW, Flag: model.PRIVATE},
 		{Key: "external_previews", Value: `{}`, Type: conf.TypeText, Group: model.PREVIEW},
-		{Key: "iframe_previews", Value: `{
-	"doc,docx,xls,xlsx,ppt,pptx": {
-		"Microsoft":"https://view.officeapps.live.com/op/view.aspx?src=$e_url",
-		"Google":"https://docs.google.com/gview?url=$e_url&embedded=true"
-	},
-	"pdf": {
-		"PDF.js":"https://res.oplist.org/pdf.js/web/viewer.html?file=$e_url"
-	},
-	"epub": {
-		"EPUB.js":"https://res.oplist.org/epub.js/viewer.html?url=$e_url"
-	}
-}`, Type: conf.TypeText, Group: model.PREVIEW},
-		//		{Key: conf.OfficeViewers, Value: `{
-		//	"Microsoft":"https://view.officeapps.live.com/op/view.aspx?src=$url",
-		//	"Google":"https://docs.google.com/gview?url=$url&embedded=true",
-		//}`, Type: conf.TypeText, Group: model.PREVIEW},
-		//		{Key: conf.PdfViewers, Value: `{
-		//	"pdf.js":"https://openlistteam.github.io/pdf.js/web/viewer.html?file=$url"
-		//}`, Type: conf.TypeText, Group: model.PREVIEW},
+		{Key: "iframe_previews", Value: `{"doc,docx,xls,xlsx,ppt,pptx": {"Google文档预览": "https://docs.google.com/gview?url=$e_url&embedded=true"},"epub": {"EPUB 预览": "https://epubjs-reader.vercel.app/?url=$e_url"}}`, Type: conf.TypeText, Group: model.PREVIEW},
 		{Key: "audio_cover", Value: "/images/audio.png", Type: conf.TypeString, Group: model.PREVIEW},
 		{Key: conf.AudioAutoplay, Value: "true", Type: conf.TypeBool, Group: model.PREVIEW},
 		{Key: conf.VideoAutoplay, Value: "true", Type: conf.TypeBool, Group: model.PREVIEW},
@@ -157,7 +139,7 @@ func InitialSettings() []model.SettingItem {
 		// global settings
 		{Key: conf.HideFiles, Value: "/\\/README.md/i\n/\\/Thumbs.db/i\n/\\/.DS_Store/i\n/\\/@eaDir/i\n/\\/#recycle/i", Type: conf.TypeText, Group: model.GLOBAL},
 		{Key: "package_download", Value: "true", Type: conf.TypeBool, Group: model.GLOBAL},
-		{Key: conf.CustomizeHead, MigrationValue: `<script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=String.prototype.replaceAll"></script>`, Type: conf.TypeText, Group: model.GLOBAL, Flag: model.PRIVATE},
+		{Key: conf.CustomizeHead, MigrationValue: ``, Type: conf.TypeText, Group: model.GLOBAL, Flag: model.PRIVATE},
 		{Key: conf.CustomizeBody, Type: conf.TypeText, Group: model.GLOBAL, Flag: model.PRIVATE},
 		{Key: conf.LinkExpiration, Value: "0", Type: conf.TypeNumber, Group: model.GLOBAL, Flag: model.PRIVATE},
 		{Key: conf.SignAll, Value: "true", Type: conf.TypeBool, Group: model.GLOBAL, Flag: model.PRIVATE},
@@ -165,7 +147,7 @@ func InitialSettings() []model.SettingItem {
 ([[:xdigit:]]{1,4}(?::[[:xdigit:]]{1,4}){7}|::|:(?::[[:xdigit:]]{1,4}){1,6}|[[:xdigit:]]{1,4}:(?::[[:xdigit:]]{1,4}){1,5}|(?:[[:xdigit:]]{1,4}:){2}(?::[[:xdigit:]]{1,4}){1,4}|(?:[[:xdigit:]]{1,4}:){3}(?::[[:xdigit:]]{1,4}){1,3}|(?:[[:xdigit:]]{1,4}:){4}(?::[[:xdigit:]]{1,4}){1,2}|(?:[[:xdigit:]]{1,4}:){5}:[[:xdigit:]]{1,4}|(?:[[:xdigit:]]{1,4}:){1,6}:)
 (?U)access_token=(.*)&`,
 			Type: conf.TypeText, Group: model.GLOBAL, Flag: model.PRIVATE,},
-		{Key: conf.OcrApi, Value: "https://openlistteam-ocr-api-server.hf.space/ocr/file/json", MigrationValue: "https://api.example.com/ocr/file/json", Type: conf.TypeString, Group: model.GLOBAL}, // TODO: This can be replace by a community-hosted endpoint, see https://github.com/OpenListTeam/ocr_api_server
+		{Key: conf.OcrApi, Value: "", MigrationValue: "", Type: conf.TypeString, Group: model.GLOBAL},
 		{Key: conf.FilenameCharMapping, Value: `{"/": "|"}`, Type: conf.TypeText, Group: model.GLOBAL},
 		{Key: conf.ForwardDirectLinkParams, Value: "false", Type: conf.TypeBool, Group: model.GLOBAL},
 		{Key: conf.IgnoreDirectLinkParams, Value: "sign,inoi_ts", Type: conf.TypeString, Group: model.GLOBAL},
