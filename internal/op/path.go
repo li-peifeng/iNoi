@@ -18,7 +18,7 @@ func GetStorageAndActualPath(rawPath string) (storage driver.Driver, actualPath 
 	storage = GetBalancedStorage(rawPath)
 	if storage == nil {
 		if rawPath == "/" {
-			err = errs.NewErr(errs.StorageNotFound, "请先创建存储空间")
+			err = errs.NewErr(errs.StorageNotFound, "请先创建存储")
 			return
 		}
 		err = errs.NewErr(errs.StorageNotFound, "原始路径: %s", rawPath)
