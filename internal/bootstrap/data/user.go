@@ -16,12 +16,14 @@ import (
 
 func initUser() {
 	admin, err := op.GetAdmin()
-	adminPassword := random.String(8)
-	envpass := os.Getenv("INOI_ADMIN_PASSWORD")
+	// 先确定密码来源
+	var adminPassword string
 	if flags.Dev {
-		adminPassword = "admin"
-	} else if len(envpass) > 0 {
-		adminPassword = envpass
+		adminPassword = "admin" // 开发环境
+	} else if envpass := os.Getenv("INOI_ADMIN_PASSWORD"); envpass != "" {
+		adminPassword = envpass // 生产环境优先用环境变量
+	} else {
+		adminPassword = "iNoi-PSWD" // 默认值
 	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
