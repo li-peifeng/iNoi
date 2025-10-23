@@ -126,7 +126,7 @@ func InitialSettings() []model.SettingItem {
 		{Key: conf.ProxyTypes, Value: "m3u8,url", Type: conf.TypeText, Group: model.PREVIEW, Flag: model.PRIVATE},
 		{Key: conf.ProxyIgnoreHeaders, Value: "authorization,referer", Type: conf.TypeText, Group: model.PREVIEW, Flag: model.PRIVATE},
 		{Key: "external_previews", Value: `{}`, Type: conf.TypeText, Group: model.PREVIEW},
-		{Key: "iframe_previews", Value: `{"doc,docx,xls,xlsx,ppt,pptx": {"Google文档预览": "https://docs.google.com/gview?url=$e_url&embedded=true"},"epub": {"EPUB 预览": "https://epubjs-reader.vercel.app/?url=$e_url"}}`, Type: conf.TypeText, Group: model.PREVIEW},
+		{Key: "iframe_previews", Value: `{"doc,docx,xls,xlsx,ppt,pptx": {"Google 文档预览": "https://docs.google.com/gview?url=$e_url&embedded=true"}, "epub": {"EPUB 文档预览": "/static/epub.js/viewer.html?url=$e_url"}}`, Type: conf.TypeText, Group: model.PREVIEW},
 		{Key: "audio_cover", Value: "/images/audio.png", Type: conf.TypeString, Group: model.PREVIEW},
 		{Key: conf.AudioAutoplay, Value: "true", Type: conf.TypeBool, Group: model.PREVIEW},
 		{Key: conf.VideoAutoplay, Value: "true", Type: conf.TypeBool, Group: model.PREVIEW},
