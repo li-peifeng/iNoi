@@ -38,7 +38,7 @@ func (a *QBittorrent) Init() (string, error) {
 		return "", err
 	}
 	a.client = qbClient
-	return "完成", nil
+	return "ok", nil
 }
 
 func (a *QBittorrent) IsReady() bool {

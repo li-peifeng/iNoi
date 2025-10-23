@@ -15,7 +15,6 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
-	log "github.com/sirupsen/logrus"
 )
 
 type Strm struct {
@@ -41,9 +40,6 @@ func (d *Strm) Init(ctx context.Context) error {
 	if d.Paths == "" {
 		return errors.New("paths is required")
 	}
-	if d.SaveStrmToLocal && len(d.SaveStrmLocalPath) <= 0 {
-		return errors.New("SaveStrmLocalPath is required")
-	}
 	d.pathMap = make(map[string][]string)
 	for _, path := range strings.Split(d.Paths, "\n") {
 		path = strings.TrimSpace(path)
@@ -52,11 +48,6 @@ func (d *Strm) Init(ctx context.Context) error {
 		}
 		k, v := getPair(path)
 		d.pathMap[k] = append(d.pathMap[k], v)
-		err := InsertStrm(utils.FixAndCleanPath(strings.TrimSpace(path)), d)
-		if err != nil {
-			log.Errorf("insert strmTrie error: %v", err)
-			continue
-		}
 	}
 	if len(d.pathMap) == 1 {
 		for k := range d.pathMap {
@@ -96,9 +87,6 @@ func (d *Strm) Drop(ctx context.Context) error {
 	d.pathMap = nil
 	d.downloadSuffix = nil
 	d.supportSuffix = nil
-	for _, path := range strings.Split(d.Paths, "\n") {
-		RemoveStrm(utils.FixAndCleanPath(strings.TrimSpace(path)), d)
-	}
 	return nil
 }
 

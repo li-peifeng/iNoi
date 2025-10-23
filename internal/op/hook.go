@@ -1,7 +1,6 @@
 package op
 
 import (
-	"context"
 	"regexp"
 	"strings"
 
@@ -14,7 +13,7 @@ import (
 )
 
 // Obj
-type ObjsUpdateHook = func(ctx context.Context, parent string, objs []model.Obj)
+type ObjsUpdateHook = func(parent string, objs []model.Obj)
 
 var (
 	objsUpdateHooks = make([]ObjsUpdateHook, 0)
@@ -24,9 +23,9 @@ func RegisterObjsUpdateHook(hook ObjsUpdateHook) {
 	objsUpdateHooks = append(objsUpdateHooks, hook)
 }
 
-func HandleObjsUpdateHook(ctx context.Context, parent string, objs []model.Obj) {
+func HandleObjsUpdateHook(parent string, objs []model.Obj) {
 	for _, hook := range objsUpdateHooks {
-		hook(ctx, parent, objs)
+		hook(parent, objs)
 	}
 }
 

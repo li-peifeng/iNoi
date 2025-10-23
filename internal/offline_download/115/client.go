@@ -32,7 +32,7 @@ func (p *Cloud115) Run(task *tool.DownloadTask) error {
 
 func (p *Cloud115) Init() (string, error) {
 	p.refreshTaskCache = false
-	return "完成", nil
+	return "ok", nil
 }
 
 func (p *Cloud115) IsReady() bool {

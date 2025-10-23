@@ -33,7 +33,7 @@ func (p *PikPak) Run(task *tool.DownloadTask) error {
 
 func (p *PikPak) Init() (string, error) {
 	p.refreshTaskCache = false
-	return "完成", nil
+	return "ok", nil
 }
 
 func (p *PikPak) IsReady() bool {

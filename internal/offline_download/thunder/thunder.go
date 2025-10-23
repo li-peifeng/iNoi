@@ -34,7 +34,7 @@ func (t *Thunder) Run(task *tool.DownloadTask) error {
 
 func (t *Thunder) Init() (string, error) {
 	t.refreshTaskCache = false
-	return "完成", nil
+	return "ok", nil
 }
 
 func (t *Thunder) IsReady() bool {
