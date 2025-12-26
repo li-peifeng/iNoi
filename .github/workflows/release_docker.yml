@@ -4,10 +4,50 @@ on:
   push:
     tags:
       - '*'
-  workflow_dispatch:    
+  workflow_dispatch:
 
 jobs:
+  build_binary:
+    name: Build Go Binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      
+      - name: Cache Musl
+        id: cache-musl
+        uses: actions/cache@v4
+        with:
+          path: build/musl-libs
+          key: docker-musl-libs
+      
+      - name: Download Musl Library
+        if: steps.cache-musl.outputs.cache-hit != 'true'
+        run: bash build.sh prepare docker-multiplatform
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build go binary
+        run: bash build.sh release docker-multiplatform
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries_docker_release
+          overwrite: true
+          path: |
+            build/
+            !build/*.tgz
+            !build/musl-libs/**
+
   push_to_registries:
+    needs: build_binary
     name: Push Docker image to multiple registries
     runs-on: ubuntu-latest
     permissions:
@@ -15,32 +55,27 @@ jobs:
       contents: read
       attestations: write
       id-token: write
+    strategy:
+      matrix:
+        image: ["latest", "ffmpeg"]
+        include:
+          - image: "latest"
+            build_arg: ""
+            tag_favor: ""
+          - image: "ffmpeg"
+            build_arg: INSTALL_FFMPEG=true
+            tag_favor: "suffix=-ffmpeg,onlatest=true"
+    
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          go-version: "stable"
-
-      - name: Cache Musl
-        id: cache-musl
-        uses: actions/cache@v4
-        with:
-          path: build/musl-libs
-          key: docker-musl-libs
-
-      - name: Download Musl Library
-        if: steps.cache-musl.outputs.cache-hit != 'true'
-        run: bash build.sh prepare docker-multiplatform
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build go binary
-        run: bash build.sh release docker-multiplatform
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          name: binaries_docker_release
+          path: 'build/'
+      
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -48,37 +83,40 @@ jobs:
           images: |
             leolitaly/inoi
             ghcr.io/${{ github.repository }}
-            crpi-lzr94m9idb4j2kpi.cn-shanghai.personal.cr.aliyuncs.com/isweet/inoi
-
+            crpi-4gzagxlw13387lm6.cn-shanghai.personal.cr.aliyuncs.com/isweethub/inoi
+          flavor: |
+            latest=auto
+            ${{ matrix.tag_favor }}
+      
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
+      
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+      
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
+      
       - name: Log in to aliyun
         uses: docker/login-action@v3
         with:
-          registry: crpi-lzr94m9idb4j2kpi.cn-shanghai.personal.cr.aliyuncs.com
+          registry: crpi-4gzagxlw13387lm6.cn-shanghai.personal.cr.aliyuncs.com
           username: ${{ secrets.ALI_USERNAME }}
           password: ${{ secrets.ALI_TOKEN }}
-
+      
       - name: Build and push Docker images
         id: push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.ci
@@ -86,4 +124,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x
-
+          build-args: |
+            ${{ matrix.build_arg }}
