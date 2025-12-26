@@ -32,7 +32,7 @@
 
 - Docker Hub 和 ghcr.io 访问有问题的国内用户可以用此源拉取镜像
 
-- docker pull crpi-lzr94m9idb4j2kpi.cn-shanghai.personal.cr.aliyuncs.com/isweet/inoi:latest
+- docker pull crpi-4gzagxlw13387lm6.cn-shanghai.personal.cr.aliyuncs.com/isweethub/inoi:latest
 
 ##### 预览图
 
