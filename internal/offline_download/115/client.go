@@ -59,9 +59,8 @@ func (p *Cloud115) AddURL(args *tool.AddUrlArgs) (string, error) {
 	}
 	driver115, ok := storage.(*_115.Pan115)
 	if !ok {
-		return "", fmt.Errorf("不支持此存储，仅支持 115 Cloud")
+		return "", fmt.Errorf("不支持此存储，仅支持 115")
 	}
-
 	ctx := context.Background()
 
 	if err := op.MakeDir(ctx, storage, actualPath); err != nil {
@@ -88,7 +87,7 @@ func (p *Cloud115) Remove(task *tool.DownloadTask) error {
 	}
 	driver115, ok := storage.(*_115.Pan115)
 	if !ok {
-		return fmt.Errorf("不支持此存储，仅支持 115 Cloud")
+		return fmt.Errorf("不支持此存储，仅支持 115")
 	}
 
 	ctx := context.Background()
@@ -105,7 +104,7 @@ func (p *Cloud115) Status(task *tool.DownloadTask) (*tool.Status, error) {
 	}
 	driver115, ok := storage.(*_115.Pan115)
 	if !ok {
-		return nil, fmt.Errorf("不支持此存储，仅支持 115 Cloud")
+		return nil, fmt.Errorf("不支持此存储，仅支持 115")
 	}
 
 	tasks, err := driver115.OfflineList(context.Background())
@@ -133,7 +132,7 @@ func (p *Cloud115) Status(task *tool.DownloadTask) (*tool.Status, error) {
 		}
 	}
 	s.Err = fmt.Errorf("任务已被删除")
-	return nil, nil
+	return s, nil
 }
 
 var _ tool.Tool = (*Cloud115)(nil)

@@ -20,6 +20,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/avast/retry-go"
 	weiyunsdkgo "github.com/foxxorcat/weiyun-sdk-go"
+	"github.com/go-resty/resty/v2"
 )
 
 type WeiYun struct {
@@ -391,6 +392,22 @@ func (d *WeiYun) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 	}, nil
 }
 
+func (d *WeiYun) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
+	info, err := d.client.DiskUserInfoGet(func(request *resty.Request) {
+		request.SetContext(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.StorageDetails{
+		DiskUsage: model.DiskUsage{
+			TotalSpace: info.TotalSpace,
+			UsedSpace:  info.UsedSpace,
+		},
+	}, nil
+}
+
 // func (d *WeiYun) Other(ctx context.Context, args model.OtherArgs) (interface{}, error) {
 // 	return nil, errs.NotSupport
 // }
@@ -405,3 +422,4 @@ var _ driver.Remove = (*WeiYun)(nil)
 
 var _ driver.PutResult = (*WeiYun)(nil)
 var _ driver.RenameResult = (*WeiYun)(nil)
+var _ driver.WithDetails = (*WeiYun)(nil)

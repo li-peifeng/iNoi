@@ -6,18 +6,18 @@ import (
 	"strings"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
-	"github.com/OpenListTeam/OpenList/v4/internal/task"
-
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/fs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/sign"
+	"github.com/OpenListTeam/OpenList/v4/internal/task"
 	"github.com/OpenListTeam/OpenList/v4/pkg/generic"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 type MkdirOrLinkReq struct {
@@ -57,10 +57,12 @@ func FsMkdir(c *gin.Context) {
 }
 
 type MoveCopyReq struct {
-	SrcDir    string   `json:"src_dir"`
-	DstDir    string   `json:"dst_dir"`
-	Names     []string `json:"names"`
-	Overwrite bool     `json:"overwrite"`
+	SrcDir       string   `json:"src_dir"`
+	DstDir       string   `json:"dst_dir"`
+	Names        []string `json:"names"`
+	Overwrite    bool     `json:"overwrite"`
+	SkipExisting bool     `json:"skip_existing"`
+	Merge        bool     `json:"merge"`
 }
 
 func FsMove(c *gin.Context) {
@@ -70,17 +72,12 @@ func FsMove(c *gin.Context) {
 		return
 	}
 	if len(req.Names) == 0 {
-		common.ErrorStrResp(c, "空文件名", 400)
+		common.ErrorStrResp(c, "文件名为空", 400)
 		return
 	}
 	user := c.Request.Context().Value(conf.UserKey).(*model.User)
 	if !user.CanMove() {
 		common.ErrorResp(c, errs.PermissionDenied, 403)
-		return
-	}
-	srcDir, err := user.JoinPath(req.SrcDir)
-	if err != nil {
-		common.ErrorResp(c, err, 403)
 		return
 	}
 	dstDir, err := user.JoinPath(req.DstDir)
@@ -89,20 +86,38 @@ func FsMove(c *gin.Context) {
 		return
 	}
 
-	if !req.Overwrite {
-		for _, name := range req.Names {
-			if res, _ := fs.Get(c.Request.Context(), stdpath.Join(dstDir, name), &fs.GetArgs{NoLog: true}); res != nil {
-				common.ErrorStrResp(c, fmt.Sprintf("file [%s] exists", name), 403)
+	validPaths := make([]string, 0, len(req.Names))
+	for _, name := range req.Names {
+		// ensure req.Names is not a relative path
+		srcPath := stdpath.Join(req.SrcDir, name)
+		srcPath, err = user.JoinPath(srcPath)
+		if err != nil {
+			common.ErrorResp(c, err, 403)
+			return
+		}
+		if !req.Overwrite {
+			base := stdpath.Base(srcPath)
+			if base == "." || base == "/" {
+				common.ErrorStrResp(c, fmt.Sprintf("invalid file name [%s]", name), 400)
 				return
 			}
+			if res, _ := fs.Get(c.Request.Context(), stdpath.Join(dstDir, base), &fs.GetArgs{NoLog: true}); res != nil {
+				if !req.SkipExisting {
+					common.ErrorStrResp(c, fmt.Sprintf("file [%s] exists", name), 403)
+					return
+				} else {
+					continue
+				}
+			}
 		}
+		validPaths = append(validPaths, srcPath)
 	}
 
 	// Create all tasks immediately without any synchronous validation
 	// All validation will be done asynchronously in the background
 	var addedTasks []task.TaskExtensionInfo
-	for i, name := range req.Names {
-		t, err := fs.Move(c.Request.Context(), stdpath.Join(srcDir, name), dstDir, len(req.Names) > i+1)
+	for i, p := range validPaths {
+		t, err := fs.Move(c.Request.Context(), p, dstDir, len(validPaths) > i+1)
 		if t != nil {
 			addedTasks = append(addedTasks, t)
 		}
@@ -115,12 +130,12 @@ func FsMove(c *gin.Context) {
 	// Return immediately with task information
 	if len(addedTasks) > 0 {
 		common.SuccessResp(c, gin.H{
-			"message": fmt.Sprintf("Successfully created %d move task(s)", len(addedTasks)),
+			"message": fmt.Sprintf("成功创建 %d 个移动任务", len(addedTasks)),
 			"tasks":   getTaskInfos(addedTasks),
 		})
 	} else {
 		common.SuccessResp(c, gin.H{
-			"message": "Move operations completed immediately",
+			"message": "移动操作已立即完成",
 		})
 	}
 }
@@ -132,17 +147,12 @@ func FsCopy(c *gin.Context) {
 		return
 	}
 	if len(req.Names) == 0 {
-		common.ErrorStrResp(c, "空文件名", 400)
+		common.ErrorStrResp(c, "文件名为空", 400)
 		return
 	}
 	user := c.Request.Context().Value(conf.UserKey).(*model.User)
 	if !user.CanCopy() {
 		common.ErrorResp(c, errs.PermissionDenied, 403)
-		return
-	}
-	srcDir, err := user.JoinPath(req.SrcDir)
-	if err != nil {
-		common.ErrorResp(c, err, 403)
 		return
 	}
 	dstDir, err := user.JoinPath(req.DstDir)
@@ -151,20 +161,43 @@ func FsCopy(c *gin.Context) {
 		return
 	}
 
-	if !req.Overwrite {
-		for _, name := range req.Names {
-			if res, _ := fs.Get(c.Request.Context(), stdpath.Join(dstDir, name), &fs.GetArgs{NoLog: true}); res != nil {
-				common.ErrorStrResp(c, fmt.Sprintf("file [%s] exists", name), 403)
+	validPaths := make([]string, 0, len(req.Names))
+	for _, name := range req.Names {
+		// ensure req.Names is not a relative path
+		srcPath := stdpath.Join(req.SrcDir, name)
+		srcPath, err = user.JoinPath(srcPath)
+		if err != nil {
+			common.ErrorResp(c, err, 403)
+			return
+		}
+		if !req.Overwrite {
+			base := stdpath.Base(srcPath)
+			if base == "." || base == "/" {
+				common.ErrorStrResp(c, fmt.Sprintf("invalid file name [%s]", name), 400)
 				return
 			}
+			if res, _ := fs.Get(c.Request.Context(), stdpath.Join(dstDir, base), &fs.GetArgs{NoLog: true}); res != nil {
+				if !req.SkipExisting && !req.Merge {
+					common.ErrorStrResp(c, fmt.Sprintf("file [%s] exists", name), 403)
+					return
+				} else if !req.Merge || !res.IsDir() {
+					continue
+				}
+			}
 		}
+		validPaths = append(validPaths, srcPath)
 	}
 
 	// Create all tasks immediately without any synchronous validation
 	// All validation will be done asynchronously in the background
 	var addedTasks []task.TaskExtensionInfo
-	for i, name := range req.Names {
-		t, err := fs.Copy(c.Request.Context(), stdpath.Join(srcDir, name), dstDir, len(req.Names) > i+1)
+	for i, p := range validPaths {
+		var t task.TaskExtensionInfo
+		if req.Merge {
+			t, err = fs.Merge(c.Request.Context(), p, dstDir, len(validPaths) > i+1)
+		} else {
+			t, err = fs.Copy(c.Request.Context(), p, dstDir, len(validPaths) > i+1)
+		}
 		if t != nil {
 			addedTasks = append(addedTasks, t)
 		}
@@ -177,12 +210,12 @@ func FsCopy(c *gin.Context) {
 	// Return immediately with task information
 	if len(addedTasks) > 0 {
 		common.SuccessResp(c, gin.H{
-			"message": fmt.Sprintf("Successfully created %d copy task(s)", len(addedTasks)),
+			"message": fmt.Sprintf("成功创建 %d 个复制任务", len(addedTasks)),
 			"tasks":   getTaskInfos(addedTasks),
 		})
 	} else {
 		common.SuccessResp(c, gin.H{
-			"message": "Copy operations completed immediately",
+			"message": "复制操作已立即完成",
 		})
 	}
 }
@@ -247,7 +280,7 @@ func FsRemove(c *gin.Context) {
 		return
 	}
 	if len(req.Names) == 0 {
-		common.ErrorStrResp(c, "空文件名", 400)
+		common.ErrorStrResp(c, "文件名为空", 400)
 		return
 	}
 	user := c.Request.Context().Value(conf.UserKey).(*model.User)
@@ -255,13 +288,25 @@ func FsRemove(c *gin.Context) {
 		common.ErrorResp(c, errs.PermissionDenied, 403)
 		return
 	}
-	reqDir, err := user.JoinPath(req.Dir)
-	if err != nil {
-		common.ErrorResp(c, err, 403)
-		return
+	for i, name := range req.Names {
+		if strings.TrimSpace(utils.FixAndCleanPath(name)) == "/" {
+			log.Warnf("FsRemove: 无效项已跳过: %s (父目录: %s)\n", name, req.Dir)
+			req.Names[i] = ""
+			continue
+		}
+		// ensure req.Names is not a relative path
+		var err error
+		req.Names[i], err = user.JoinPath(stdpath.Join(req.Dir, name))
+		if err != nil {
+			common.ErrorResp(c, err, 403)
+			return
+		}
 	}
-	for _, name := range req.Names {
-		err := fs.Remove(c.Request.Context(), stdpath.Join(reqDir, name))
+	for _, path := range req.Names {
+		if path == "" {
+			continue
+		}
+		err := fs.Remove(c.Request.Context(), path)
 		if err != nil {
 			common.ErrorResp(c, err, 500)
 			return

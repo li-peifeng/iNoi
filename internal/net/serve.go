@@ -195,9 +195,9 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request, name string, modTime time
 			if errors.Is(context.Cause(ctx), context.Canceled) {
 				return nil
 			}
-			log.Warnf("ServeHttp error. err: %s ", err)
+			log.Warnf("ServeHttp 错误. 错误: %s ", err)
 			if written != sendSize {
-				log.Warnf("Maybe size incorrect or reader not giving correct/full data, or connection closed before finish. written bytes: %d ,sendSize:%d, ", written, sendSize)
+				log.Warnf("可能是大小不正确或读取器未提供正确/完整的数据，或者连接在完成之前关闭。已写入字节: %d ,发送大小:%d, ", written, sendSize)
 			}
 			code = http.StatusInternalServerError
 			if statusCode, ok := errs.UnwrapOrSelf(err).(HttpStatusCodeError); ok {
@@ -273,7 +273,7 @@ func HttpClient() *http.Client {
 		httpClient = NewHttpClient()
 		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
-				return errors.New("stopped after 10 redirects")
+				return errors.New("重定向超过 10 次")
 			}
 			req.Header.Del("Referer")
 			return nil
@@ -283,11 +283,15 @@ func HttpClient() *http.Client {
 }
 
 func NewHttpClient() *http.Client {
+	transport := &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify},
+	}
+
+	SetProxyIfConfigured(transport)
+
 	return &http.Client{
-		Timeout: time.Hour * 48,
-		Transport: &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify},
-		},
+		Timeout:   time.Hour * 48,
+		Transport: transport,
 	}
 }

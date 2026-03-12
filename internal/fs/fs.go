@@ -28,7 +28,7 @@ func List(ctx context.Context, path string, args *ListArgs) ([]model.Obj, error)
 	res, err := list(ctx, path, args)
 	if err != nil {
 		if !args.NoLog {
-			log.Errorf("failed list %s: %+v", path, err)
+			log.Errorf("获取列表失败 %s: %+v", path, err)
 		}
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func Get(ctx context.Context, path string, args *GetArgs) (model.Obj, error) {
 	res, err := get(ctx, path, args)
 	if err != nil {
 		if !args.NoLog {
-			log.Warnf("failed get %s: %s", path, err)
+			log.Warnf("获取 %s 失败: %s", path, err)
 		}
 		return nil, err
 	}
@@ -54,40 +54,48 @@ func Get(ctx context.Context, path string, args *GetArgs) (model.Obj, error) {
 func Link(ctx context.Context, path string, args model.LinkArgs) (*model.Link, model.Obj, error) {
 	res, file, err := link(ctx, path, args)
 	if err != nil {
-		log.Errorf("failed link %s: %+v", path, err)
+		log.Errorf("创建链接失败 %s: %+v", path, err)
 		return nil, nil, err
 	}
 	return res, file, nil
 }
 
-func MakeDir(ctx context.Context, path string, lazyCache ...bool) error {
-	err := makeDir(ctx, path, lazyCache...)
+func MakeDir(ctx context.Context, path string) error {
+	err := makeDir(ctx, path)
 	if err != nil {
-		log.Errorf("failed make dir %s: %+v", path, err)
+		log.Errorf("创建目录失败 %s: %+v", path, err)
 	}
 	return err
 }
 
-func Move(ctx context.Context, srcPath, dstDirPath string, lazyCache ...bool) (task.TaskExtensionInfo, error) {
-	req, err := transfer(ctx, move, srcPath, dstDirPath, lazyCache...)
+func Move(ctx context.Context, srcPath, dstDirPath string, skipHook ...bool) (task.TaskExtensionInfo, error) {
+	req, err := transfer(ctx, move, srcPath, dstDirPath, skipHook...)
 	if err != nil {
-		log.Errorf("failed move %s to %s: %+v", srcPath, dstDirPath, err)
+		log.Errorf("移动失败 %s 到 %s: %+v", srcPath, dstDirPath, err)
 	}
 	return req, err
 }
 
-func Copy(ctx context.Context, srcObjPath, dstDirPath string, lazyCache ...bool) (task.TaskExtensionInfo, error) {
-	res, err := transfer(ctx, copy, srcObjPath, dstDirPath, lazyCache...)
+func Copy(ctx context.Context, srcObjPath, dstDirPath string, skipHook ...bool) (task.TaskExtensionInfo, error) {
+	res, err := transfer(ctx, copy, srcObjPath, dstDirPath, skipHook...)
 	if err != nil {
-		log.Errorf("failed copy %s to %s: %+v", srcObjPath, dstDirPath, err)
+		log.Errorf("复制失败 %s 到 %s: %+v", srcObjPath, dstDirPath, err)
 	}
 	return res, err
 }
 
-func Rename(ctx context.Context, srcPath, dstName string, lazyCache ...bool) error {
-	err := rename(ctx, srcPath, dstName, lazyCache...)
+func Merge(ctx context.Context, srcObjPath, dstDirPath string, skipHook ...bool) (task.TaskExtensionInfo, error) {
+	res, err := transfer(ctx, merge, srcObjPath, dstDirPath, skipHook...)
 	if err != nil {
-		log.Errorf("failed rename %s to %s: %+v", srcPath, dstName, err)
+		log.Errorf("合并失败 %s 到 %s: %+v", srcObjPath, dstDirPath, err)
+	}
+	return res, err
+}
+
+func Rename(ctx context.Context, srcPath, dstName string, skipHook ...bool) error {
+	err := rename(ctx, srcPath, dstName, skipHook...)
+	if err != nil {
+		log.Errorf("重命名失败 %s 到 %s: %+v", srcPath, dstName, err)
 	}
 	return err
 }
@@ -95,15 +103,15 @@ func Rename(ctx context.Context, srcPath, dstName string, lazyCache ...bool) err
 func Remove(ctx context.Context, path string) error {
 	err := remove(ctx, path)
 	if err != nil {
-		log.Errorf("failed remove %s: %+v", path, err)
+		log.Errorf("删除失败 %s: %+v", path, err)
 	}
 	return err
 }
 
-func PutDirectly(ctx context.Context, dstDirPath string, file model.FileStreamer, lazyCache ...bool) error {
-	err := putDirectly(ctx, dstDirPath, file, lazyCache...)
+func PutDirectly(ctx context.Context, dstDirPath string, file model.FileStreamer, skipHook ...bool) error {
+	err := putDirectly(ctx, dstDirPath, file, skipHook...)
 	if err != nil {
-		log.Errorf("failed put %s: %+v", dstDirPath, err)
+		log.Errorf("直接上传失败 %s: %+v", dstDirPath, err)
 	}
 	return err
 }
@@ -111,7 +119,7 @@ func PutDirectly(ctx context.Context, dstDirPath string, file model.FileStreamer
 func PutAsTask(ctx context.Context, dstDirPath string, file model.FileStreamer) (task.TaskExtensionInfo, error) {
 	t, err := putAsTask(ctx, dstDirPath, file)
 	if err != nil {
-		log.Errorf("failed put %s: %+v", dstDirPath, err)
+		log.Errorf("直接上传失败 %s: %+v", dstDirPath, err)
 	}
 	return t, err
 }
@@ -119,7 +127,7 @@ func PutAsTask(ctx context.Context, dstDirPath string, file model.FileStreamer) 
 func ArchiveMeta(ctx context.Context, path string, args model.ArchiveMetaArgs) (*model.ArchiveMetaProvider, error) {
 	meta, err := archiveMeta(ctx, path, args)
 	if err != nil {
-		log.Errorf("failed get archive meta %s: %+v", path, err)
+		log.Errorf("获取归档元数据失败 %s: %+v", path, err)
 	}
 	return meta, err
 }
@@ -127,7 +135,7 @@ func ArchiveMeta(ctx context.Context, path string, args model.ArchiveMetaArgs) (
 func ArchiveList(ctx context.Context, path string, args model.ArchiveListArgs) ([]model.Obj, error) {
 	objs, err := archiveList(ctx, path, args)
 	if err != nil {
-		log.Errorf("failed list archive [%s]%s: %+v", path, args.InnerPath, err)
+		log.Errorf("获取归档列表失败 [%s]%s: %+v", path, args.InnerPath, err)
 	}
 	return objs, err
 }
@@ -135,7 +143,7 @@ func ArchiveList(ctx context.Context, path string, args model.ArchiveListArgs) (
 func ArchiveDecompress(ctx context.Context, srcObjPath, dstDirPath string, args model.ArchiveDecompressArgs, lazyCache ...bool) (task.TaskExtensionInfo, error) {
 	t, err := archiveDecompress(ctx, srcObjPath, dstDirPath, args, lazyCache...)
 	if err != nil {
-		log.Errorf("failed decompress [%s]%s: %+v", srcObjPath, args.InnerPath, err)
+		log.Errorf("归档解压失败 [%s]%s: %+v", srcObjPath, args.InnerPath, err)
 	}
 	return t, err
 }
@@ -143,7 +151,7 @@ func ArchiveDecompress(ctx context.Context, srcObjPath, dstDirPath string, args 
 func ArchiveDriverExtract(ctx context.Context, path string, args model.ArchiveInnerArgs) (*model.Link, model.Obj, error) {
 	l, obj, err := archiveDriverExtract(ctx, path, args)
 	if err != nil {
-		log.Errorf("failed extract [%s]%s: %+v", path, args.InnerPath, err)
+		log.Errorf("归档提取失败 [%s]%s: %+v", path, args.InnerPath, err)
 	}
 	return l, obj, err
 }
@@ -151,7 +159,7 @@ func ArchiveDriverExtract(ctx context.Context, path string, args model.ArchiveIn
 func ArchiveInternalExtract(ctx context.Context, path string, args model.ArchiveInnerArgs) (io.ReadCloser, int64, error) {
 	l, obj, err := archiveInternalExtract(ctx, path, args)
 	if err != nil {
-		log.Errorf("failed extract [%s]%s: %+v", path, args.InnerPath, err)
+		log.Errorf("归档内部提取失败 [%s]%s: %+v", path, args.InnerPath, err)
 	}
 	return l, obj, err
 }
@@ -170,7 +178,7 @@ func GetStorage(path string, args *GetStoragesArgs) (driver.Driver, error) {
 func Other(ctx context.Context, args model.FsOtherArgs) (interface{}, error) {
 	res, err := other(ctx, args)
 	if err != nil {
-		log.Errorf("failed get other %s: %+v", args.Path, err)
+		log.Errorf("获取其他信息失败 %s: %+v", args.Path, err)
 	}
 	return res, err
 }
@@ -178,7 +186,7 @@ func Other(ctx context.Context, args model.FsOtherArgs) (interface{}, error) {
 func PutURL(ctx context.Context, path, dstName, urlStr string) error {
 	storage, dstDirActualPath, err := op.GetStorageAndActualPath(path)
 	if err != nil {
-		return errors.WithMessage(err, "failed get storage")
+		return errors.WithMessage(err, "存储获取失败")
 	}
 	if storage.Config().NoUpload {
 		return errors.WithStack(errs.UploadNotSupported)
@@ -189,4 +197,12 @@ func PutURL(ctx context.Context, path, dstName, urlStr string) error {
 		return errs.NotImplement
 	}
 	return op.PutURL(ctx, storage, dstDirActualPath, dstName, urlStr)
+}
+
+func GetDirectUploadInfo(ctx context.Context, tool, path, dstName string, fileSize int64) (any, error) {
+	info, err := getDirectUploadInfo(ctx, tool, path, dstName, fileSize)
+	if err != nil {
+		log.Errorf("获取 %s 直接上传信息失败 for %s(%d bytes): %+v", path, dstName, fileSize, err)
+	}
+	return info, err
 }

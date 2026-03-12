@@ -68,8 +68,7 @@ func (d *Pan115) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 		return nil, err
 	}
 	userAgent := args.Header.Get("User-Agent")
-	downloadInfo, err := d.
-		DownloadWithUA(file.(*FileObj).PickCode, userAgent)
+	downloadInfo, err := d.client.DownloadWithUA(file.(*FileObj).PickCode, userAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -252,8 +251,8 @@ func (d *Pan115) GetDetails(ctx context.Context) (*model.StorageDetails, error) 
 	}
 	return &model.StorageDetails{
 		DiskUsage: model.DiskUsage{
-			TotalSpace: uint64(info.SpaceInfo.AllTotal.Size),
-			FreeSpace:  uint64(info.SpaceInfo.AllRemain.Size),
+			TotalSpace: info.SpaceInfo.AllTotal.Size,
+			UsedSpace:  info.SpaceInfo.AllUse.Size,
 		},
 	}, nil
 }

@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"fmt"
-
 	"strings"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/bootstrap/patch"
@@ -15,7 +14,7 @@ var LastLaunchedVersion = ""
 func safeCall(v string, i int, f func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			utils.Log.Errorf("Recovered from patch (version: %s, index: %d) panic: %v", v, i, r)
+			utils.Log.Errorf("从补丁中恢复 (版本: %s, 索引: %d) 崩溃: %v", v, i, r)
 		}
 	}()
 
@@ -57,13 +56,13 @@ func InitUpgradePatch() {
 	}
 	major, minor, patchNum, err := getVersion(LastLaunchedVersion)
 	if err != nil {
-		utils.Log.Warnf("Failed to parse last launched version %s: %v, skipping all patches and rewrite last launched version", LastLaunchedVersion, err)
+		utils.Log.Warnf("解析上次启动版本 %s 失败: %v，跳过所有补丁并重写上次启动版本", LastLaunchedVersion, err)
 		return
 	}
 	for _, vp := range patch.UpgradePatches {
 		ma, mi, pn, err := getVersion(vp.Version)
 		if err != nil {
-			utils.Log.Errorf("Skip invalid version %s patches: %v", vp.Version, err)
+			utils.Log.Errorf("解析补丁版本 %s 失败: %v", vp.Version, err)
 			continue
 		}
 		if compareVersion(ma, mi, pn, major, minor, patchNum) {

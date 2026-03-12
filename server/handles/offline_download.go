@@ -5,6 +5,7 @@ import (
 
 	_115 "github.com/OpenListTeam/OpenList/v4/drivers/115"
 	_115_open "github.com/OpenListTeam/OpenList/v4/drivers/115_open"
+	_123 "github.com/OpenListTeam/OpenList/v4/drivers/123"
 	_123_open "github.com/OpenListTeam/OpenList/v4/drivers/123_open"
 	"github.com/OpenListTeam/OpenList/v4/drivers/pikpak"
 	"github.com/OpenListTeam/OpenList/v4/drivers/thunder"
@@ -126,15 +127,15 @@ func Set115(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		if _, ok := storage.(*_115.Pan115); !ok {
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only 115 Cloud is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持115 Cloud", 400)
 			return
 		}
 	}
@@ -170,15 +171,15 @@ func Set115Open(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		if _, ok := storage.(*_115_open.Open115); !ok {
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only 115 Open is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持115 Open", 400)
 			return
 		}
 	}
@@ -190,6 +191,50 @@ func Set115Open(c *gin.Context) {
 		return
 	}
 	_tool, err := tool.Tools.Get("115 Open")
+	if err != nil {
+		common.ErrorResp(c, err, 500)
+		return
+	}
+	if _, err := _tool.Init(); err != nil {
+		common.ErrorResp(c, err, 500)
+		return
+	}
+	common.SuccessResp(c, "ok")
+}
+
+type Set123PanReq struct {
+	TempDir string `json:"temp_dir" form:"temp_dir"`
+}
+
+func Set123Pan(c *gin.Context) {
+	var req Set123PanReq
+	if err := c.ShouldBind(&req); err != nil {
+		common.ErrorResp(c, err, 400)
+		return
+	}
+	if req.TempDir != "" {
+		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
+		if err != nil {
+			common.ErrorStrResp(c, "存储不存在", 400)
+			return
+		}
+		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
+			return
+		}
+		if _, ok := storage.(*_123.Pan123); !ok {
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持123Pan", 400)
+			return
+		}
+	}
+	items := []model.SettingItem{
+		{Key: conf.Pan123TempDir, Value: req.TempDir, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	}
+	if err := op.SaveSettingItems(items); err != nil {
+		common.ErrorResp(c, err, 500)
+		return
+	}
+	_tool, err := tool.Tools.Get("123Pan")
 	if err != nil {
 		common.ErrorResp(c, err, 500)
 		return
@@ -215,15 +260,15 @@ func Set123Open(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		if _, ok := storage.(*_123_open.Open123); !ok {
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only 123 Open is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持123 Open", 400)
 			return
 		}
 	}
@@ -260,15 +305,15 @@ func SetPikPak(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		if _, ok := storage.(*pikpak.PikPak); !ok {
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only PikPak is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持PikPak", 400)
 			return
 		}
 	}
@@ -304,15 +349,15 @@ func SetThunder(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		if _, ok := storage.(*thunder.Thunder); !ok {
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only Thunder is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持Thunder", 400)
 			return
 		}
 	}
@@ -348,15 +393,15 @@ func SetThunderX(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		if _, ok := storage.(*thunderx.ThunderX); !ok {
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only ThunderX is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持ThunderX", 400)
 			return
 		}
 	}
@@ -392,17 +437,17 @@ func SetThunderBrowser(c *gin.Context) {
 	if req.TempDir != "" {
 		storage, _, err := op.GetStorageAndActualPath(req.TempDir)
 		if err != nil {
-			common.ErrorStrResp(c, "storage does not exists", 400)
+			common.ErrorStrResp(c, "存储不存在", 400)
 			return
 		}
 		if storage.Config().CheckStatus && storage.GetStorage().Status != op.WORK {
-			common.ErrorStrResp(c, "storage not init: "+storage.GetStorage().Status, 400)
+			common.ErrorStrResp(c, "存储未初始化: "+storage.GetStorage().Status, 400)
 			return
 		}
 		switch storage.(type) {
 		case *thunder_browser.ThunderBrowser, *thunder_browser.ThunderBrowserExpert:
 		default:
-			common.ErrorStrResp(c, "unsupported storage driver for offline download, only ThunderBrowser is supported", 400)
+			common.ErrorStrResp(c, "不支持的存储驱动用于离线下载，仅支持ThunderBrowser", 400)
 		}
 	}
 	items := []model.SettingItem{

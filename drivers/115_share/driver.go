@@ -49,7 +49,6 @@ func (d *Pan115Share) List(ctx context.Context, dir model.Obj, args model.ListAr
 	if err := d.WaitLimit(ctx); err != nil {
 		return nil, err
 	}
-
 	files := make([]driver115.ShareFile, 0)
 	fileResp, err := d.client.GetShareSnap(d.ShareCode, d.ReceiveCode, dir.GetID(), driver115.QueryLimit(int(d.PageSize)))
 	if err != nil {

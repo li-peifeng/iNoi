@@ -41,7 +41,9 @@ func (d *Pan123) GetAddition() driver.Additional {
 }
 
 func (d *Pan123) Init(ctx context.Context) error {
-	_, err := d.Request(UserInfo, http.MethodGet, nil, nil)
+	_, err := d.Request(UserInfo, http.MethodGet, func(req *resty.Request) {
+		req.SetHeader("platform", "web")
+	}, nil)
 	return err
 }
 
@@ -258,9 +260,11 @@ func (d *Pan123) GetDetails(ctx context.Context) (*model.StorageDetails, error) 
 	if err != nil {
 		return nil, err
 	}
-	total := userInfo.Data.SpacePermanent + userInfo.Data.SpaceTemp
 	return &model.StorageDetails{
-		DiskUsage: driver.DiskUsageFromUsedAndTotal(userInfo.Data.SpaceUsed, total),
+		DiskUsage: model.DiskUsage{
+			TotalSpace: userInfo.Data.SpacePermanent + userInfo.Data.SpaceTemp,
+			UsedSpace:  userInfo.Data.SpaceUsed,
+		},
 	}, nil
 }
 

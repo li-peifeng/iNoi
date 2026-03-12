@@ -104,15 +104,15 @@ func (a *AferoAdapter) GetHandle(name string, flags int, offset int64) (ftpserve
 			return nil, err
 		}
 		if (flags & os.O_EXCL) != 0 {
-			return nil, errors.New("file already exists")
+			return nil, errors.New("文件已存在")
 		}
 		if (flags & os.O_WRONLY) != 0 {
-			return nil, errors.New("cannot write to uploading file")
+			return nil, errors.New("已存在文件，上传的文件无法保存，请先删除后重试")
 		}
 		_, err = f.Seek(offset, io.SeekStart)
 		if err != nil {
 			_ = f.Close()
-			return nil, fmt.Errorf("failed seek borrow: %+v", err)
+			return nil, fmt.Errorf("文件操作失败: %+v", err)
 		}
 		return f, nil
 	}
@@ -122,7 +122,7 @@ func (a *AferoAdapter) GetHandle(name string, flags int, offset int64) (ftpserve
 		return nil, errs.ObjectNotFound
 	}
 	if (flags&os.O_EXCL) != 0 && exists {
-		return nil, errors.New("file already exists")
+		return nil, errors.New("文件已存在")
 	}
 	if (flags & os.O_WRONLY) != 0 {
 		if offset != 0 {

@@ -30,7 +30,7 @@ func Plist(c *gin.Context) {
 	}
 	linkNameSplit := strings.Split(linkName, "/")
 	if len(linkNameSplit) != 2 {
-		common.ErrorStrResp(c, "格式错误的链接", 400)
+		common.ErrorStrResp(c, "链接格式错误", 400)
 		return
 	}
 	linkEncode := linkNameSplit[0]

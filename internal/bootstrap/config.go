@@ -54,28 +54,29 @@ func InitConfig() {
 		}
 	}
 	configPath = filepath.Clean(configPath)
-	log.Infof("reading config file: %s", configPath)
+	conf.ConfigPath = configPath
+	log.Infof("读取配置文件: %s", configPath)
 	if !utils.Exists(configPath) {
-		log.Infof("config file not exists, creating default config file")
+		log.Infof("配置文件不存在，正在创建默认配置文件")
 		_, err := utils.CreateNestedFile(configPath)
 		if err != nil {
-			log.Fatalf("failed to create config file: %+v", err)
+			log.Fatalf("创建配置文件失败: %+v", err)
 		}
 		conf.Conf = conf.DefaultConfig(dataDir)
 		LastLaunchedVersion = conf.Version
 		conf.Conf.LastLaunchedVersion = conf.Version
 		if !utils.WriteJsonToFile(configPath, conf.Conf) {
-			log.Fatalf("failed to create default config file")
+			log.Fatalf("创建默认配置文件失败")
 		}
 	} else {
 		configBytes, err := os.ReadFile(configPath)
 		if err != nil {
-			log.Fatalf("reading config file error: %+v", err)
+			log.Fatalf("读取配置文件失败: %+v", err)
 		}
 		conf.Conf = conf.DefaultConfig(dataDir)
 		err = utils.Json.Unmarshal(configBytes, conf.Conf)
 		if err != nil {
-			log.Fatalf("load config error: %+v", err)
+			log.Fatalf("加载配置文件失败: %+v", err)
 		}
 		LastLaunchedVersion = conf.Conf.LastLaunchedVersion
 		if strings.HasPrefix(conf.Version, "v") || LastLaunchedVersion == "" {
@@ -84,11 +85,11 @@ func InitConfig() {
 		// update config.json struct
 		confBody, err := utils.Json.MarshalIndent(conf.Conf, "", "  ")
 		if err != nil {
-			log.Fatalf("marshal config error: %+v", err)
+			log.Fatalf("marshal 配置文件结构失败: %+v", err)
 		}
 		err = os.WriteFile(configPath, confBody, 0o777)
 		if err != nil {
-			log.Fatalf("update config struct error: %+v", err)
+			log.Fatalf("更新配置文件结构失败: %+v", err)
 		}
 	}
 	if !conf.Conf.Force {
@@ -137,9 +138,13 @@ func InitConfig() {
 
 	err := os.MkdirAll(conf.Conf.TempDir, 0o777)
 	if err != nil {
-		log.Fatalf("create temp dir error: %+v", err)
+		log.Fatalf("创建临时目录失败: %+v", err)
 	}
 	log.Debugf("config: %+v", conf.Conf)
+
+	// Validate and display proxy configuration status
+	validateProxyConfig()
+
 	base.InitClient()
 	initURL()
 }
@@ -153,7 +158,7 @@ func confFromEnv() {
 	if err := env.ParseWithOptions(conf.Conf, env.Options{
 		Prefix: prefix,
 	}); err != nil {
-		log.Fatalf("load config from env error: %+v", err)
+		log.Fatalf("从环境变量加载配置失败: %+v", err)
 	}
 }
 
@@ -163,7 +168,7 @@ func initURL() {
 	}
 	u, err := url.Parse(conf.Conf.SiteURL)
 	if err != nil {
-		utils.Log.Fatalf("can't parse site_url: %+v", err)
+		utils.Log.Fatalf("无法解析 site_url: %+v", err)
 	}
 	conf.URL = u
 }
@@ -171,11 +176,22 @@ func initURL() {
 func CleanTempDir() {
 	files, err := os.ReadDir(conf.Conf.TempDir)
 	if err != nil {
-		log.Errorln("failed list temp file: ", err)
+		log.Errorln("列出临时文件失败: ", err)
 	}
 	for _, file := range files {
 		if err := os.RemoveAll(filepath.Join(conf.Conf.TempDir, file.Name())); err != nil {
-			log.Errorln("failed delete temp file: ", err)
+			log.Errorln("删除临时文件失败: ", err)
+		}
+	}
+}
+
+// validateProxyConfig validates proxy configuration and displays status at startup
+func validateProxyConfig() {
+	if conf.Conf.ProxyAddress != "" {
+		if _, err := url.Parse(conf.Conf.ProxyAddress); err == nil {
+			log.Infof("代理已启用: %s", conf.Conf.ProxyAddress)
+		} else {
+			log.Errorf("无效的代理地址格式: %s, 错误: %v", conf.Conf.ProxyAddress, err)
 		}
 	}
 }
